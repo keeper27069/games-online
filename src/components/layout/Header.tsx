@@ -3,42 +3,41 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Gamepad2, Dices, Volume2, User, Sparkles, Trophy, ChevronDown } from "lucide-react";
+import { Gamepad2, Dices, Trophy, User, ChevronDown, Sparkles, LogIn, DollarSign } from "lucide-react";
 import { SoundButton } from "@/components/ui/SoundButton";
 import { GAMES_CATALOG } from "@/types/games";
-import { getStoredProfile, saveStoredProfile, UserProfile } from "@/lib/storage";
+import { getCurrentUser, UserAccount } from "@/lib/auth-service";
+import { AuthModal } from "@/components/auth/AuthModal";
+import { UserProfileModal } from "@/components/auth/UserProfileModal";
+import { LeaderboardModal } from "@/components/leaderboard/LeaderboardModal";
 import { sound } from "@/lib/sound";
 
 export const Header: React.FC = () => {
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile>({ name: "Игрок #1", avatar: "🎮", theme: "cyber" });
+  const [user, setUser] = useState<UserAccount>(() => getCurrentUser());
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [tempName, setTempName] = useState("");
-  const [tempAvatar, setTempAvatar] = useState("🎮");
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isGamesMenuOpen, setIsGamesMenuOpen] = useState(false);
 
   useEffect(() => {
-    const prof = getStoredProfile();
-    setProfile(prof);
-    setTempName(prof.name);
-    setTempAvatar(prof.avatar);
+    setUser(getCurrentUser());
   }, []);
-
-  const avatars = ["🎮", "👾", "👑", "🃏", "🎲", "🚀", "⚡", "🔥", "🐱", "🤖"];
-
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    const updated = saveStoredProfile({ name: tempName || "Игрок", avatar: tempAvatar });
-    setProfile(updated);
-    setIsProfileOpen(false);
-    sound.playClick(700);
-  };
 
   const handleRandomGame = () => {
     sound.playDiceRoll();
     const randomIndex = Math.floor(Math.random() * GAMES_CATALOG.length);
     const selected = GAMES_CATALOG[randomIndex];
     router.push(`/games/${selected.id}`);
+  };
+
+  const handleUserClick = () => {
+    sound.playClick(600);
+    if (user.isGuest) {
+      setIsAuthOpen(true);
+    } else {
+      setIsProfileOpen(true);
+    }
   };
 
   return (
@@ -66,10 +65,10 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Quick Game Selector & Actions */}
+        {/* Center & Right Navigation Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Games dropdown */}
-          <div className="relative hidden md:block">
+          {/* Quick Games Dropdown */}
+          <div className="relative hidden lg:block">
             <button
               onClick={() => {
                 sound.playClick(400);
@@ -109,99 +108,73 @@ export const Header: React.FC = () => {
             )}
           </div>
 
+          {/* Leaderboard Button */}
+          <button
+            onClick={() => {
+              sound.playClick(600);
+              setIsLeaderboardOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-900/40 hover:text-white transition-all shadow-[0_0_12px_rgba(251,191,36,0.2)]"
+            title="Таблица лидеров"
+          >
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Лидеры</span>
+          </button>
+
           {/* Random Game button */}
           <button
             onClick={handleRandomGame}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-400 hover:bg-purple-600/40 transition-all shadow-[0_0_15px_rgba(168,85,247,0.2)] active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-400 hover:bg-purple-600/40 transition-all shadow-[0_0_12px_rgba(168,85,247,0.2)] active:scale-95"
             title="Случайная игра"
           >
-            <Dices className="w-4 h-4 text-pink-400 animate-spin-slow" />
-            <span className="hidden sm:inline">Случайная</span>
+            <Dices className="w-4 h-4 text-pink-400" />
+            <span className="hidden md:inline">Случайная</span>
           </button>
 
           {/* Sound Mute Toggle */}
           <SoundButton />
 
-          {/* User Profile avatar */}
+          {/* User Account / Profile Button */}
           <button
-            onClick={() => {
-              sound.playClick(600);
-              setIsProfileOpen(true);
-            }}
-            className="flex items-center gap-2 pl-2 pr-3 py-1 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800 transition-all group"
-            title="Профиль игрока"
+            onClick={handleUserClick}
+            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800 transition-all group"
+            title={user.isGuest ? "Войти в аккаунт" : "Профиль игрока"}
           >
-            <span className="text-lg">{profile.avatar}</span>
-            <span className="text-xs font-semibold text-slate-300 group-hover:text-cyan-300 max-w-[80px] truncate hidden sm:inline">
-              {profile.name}
-            </span>
+            <span className="text-lg">{user.avatar}</span>
+            <div className="text-left hidden sm:block">
+              <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 max-w-[90px] truncate leading-tight">
+                {user.username}
+              </div>
+              <div className="text-[10px] text-cyan-400 font-semibold leading-none flex items-center gap-1">
+                <span>Ур.{user.level}</span>
+                <span>•</span>
+                <span>{user.eloRating} ELO</span>
+              </div>
+            </div>
           </button>
         </div>
       </div>
 
-      {/* User Profile Modal */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-sm rounded-3xl glass-panel border border-slate-700/80 p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <User className="w-5 h-5 text-cyan-400" />
-              Профиль игрока
-            </h3>
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 font-medium block mb-1.5">Ваш никнейм</label>
-                <input
-                  type="text"
-                  maxLength={15}
-                  value={tempName}
-                  onChange={(e) => setTempName(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-400 focus:outline-none"
-                  placeholder="Введите имя..."
-                />
-              </div>
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSuccess={(updated) => setUser(updated)}
+      />
 
-              <div>
-                <label className="text-xs text-slate-400 font-medium block mb-1.5">Выберите аватар</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {avatars.map((av) => (
-                    <button
-                      key={av}
-                      type="button"
-                      onClick={() => {
-                        sound.playClick(700);
-                        setTempAvatar(av);
-                      }}
-                      className={`h-11 flex items-center justify-center text-xl rounded-xl border transition-all ${
-                        tempAvatar === av
-                          ? "bg-cyan-950 border-cyan-400 scale-105 shadow-[0_0_12px_rgba(0,210,255,0.4)]"
-                          : "bg-slate-900 border-slate-800 hover:border-slate-700"
-                      }`}
-                    >
-                      {av}
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {/* Profile Modal */}
+      <UserProfileModal
+        user={user}
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        onUpdate={(updated) => setUser(updated)}
+      />
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 transition-all shadow-[0_0_15px_rgba(0,210,255,0.3)]"
-                >
-                  Сохранить
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 hover:text-white transition-all"
-                >
-                  Отмена
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+      />
     </header>
   );
 };

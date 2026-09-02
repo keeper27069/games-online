@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, RotateCcw, BookOpen, Maximize2, Minimize2, Timer, Trophy } from "lucide-react";
+import { ArrowLeft, RotateCcw, BookOpen, Maximize2, Minimize2, Timer, Trophy, Users, Bot } from "lucide-react";
 import { GameInfo } from "@/types/games";
 import { RulesModal } from "@/components/ui/RulesModal";
 import { SoundButton } from "@/components/ui/SoundButton";
+import { RoomLobbyModal } from "@/components/multiplayer/RoomLobbyModal";
+import { InGameChat } from "@/components/multiplayer/InGameChat";
+import { multiplayerManager } from "@/lib/multiplayer-room";
 import { sound } from "@/lib/sound";
 
 interface GameContainerProps {
@@ -26,8 +29,10 @@ export const GameContainer: React.FC<GameContainerProps> = ({
   actions,
 }) => {
   const [isRulesOpen, setIsRulesOpen] = useState(false);
+  const [isLobbyOpen, setIsLobbyOpen] = useState(false);
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMultiplayerActive, setIsMultiplayerActive] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -80,16 +85,20 @@ export const GameContainer: React.FC<GameContainerProps> = ({
               <h1 className="text-sm sm:text-base font-extrabold text-white tracking-tight flex items-center gap-1.5">
                 {game.titleRu}
               </h1>
-              {game.badge && (
+              {isMultiplayerActive ? (
+                <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 animate-pulse">
+                  Онлайн 2P
+                </span>
+              ) : (
                 <span className="hidden md:inline text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-cyan-950/80 border border-cyan-500/30 text-cyan-300">
-                  {game.badge}
+                  Одиночная (AI)
                 </span>
               )}
             </div>
           </div>
 
-          {/* Center Stats: Timer & Score */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          {/* Center Stats: Timer, Score, Multiplayer mode */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-medium text-slate-300">
               <Timer className="w-3.5 h-3.5 text-cyan-400" />
               <span>{formatTimer(secondsElapsed)}</span>
@@ -103,11 +112,26 @@ export const GameContainer: React.FC<GameContainerProps> = ({
               </div>
             )}
 
+            {/* Multiplayer Room Trigger */}
+            <button
+              onClick={() => {
+                sound.playClick(600);
+                setIsLobbyOpen(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-400 text-xs font-bold transition-all shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+              title="Создать онлайн комнату или подключиться"
+            >
+              <Users className="w-3.5 h-3.5 text-pink-400" />
+              <span className="hidden sm:inline">Онлайн комната</span>
+            </button>
+
             {actions}
           </div>
 
-          {/* Right Action buttons: Rules, Reset, Sound, Fullscreen */}
+          {/* Right Action buttons: Chat, Rules, Reset, Sound, Fullscreen */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <InGameChat />
+
             {onReset && (
               <button
                 onClick={handleReset}
@@ -150,6 +174,17 @@ export const GameContainer: React.FC<GameContainerProps> = ({
 
       {/* Rules Modal */}
       <RulesModal game={game} isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
+
+      {/* Multiplayer Lobby Modal */}
+      <RoomLobbyModal
+        gameId={game.id}
+        isOpen={isLobbyOpen}
+        onClose={() => setIsLobbyOpen(false)}
+        onGameStart={() => {
+          setIsLobbyOpen(false);
+          setIsMultiplayerActive(true);
+        }}
+      />
     </div>
   );
 };
