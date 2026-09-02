@@ -31,12 +31,13 @@ export const Header: React.FC = () => {
     router.push(`/games/${selected.id}`);
   };
 
-  const handleUserClick = () => {
+  const handleUserClick = (e: React.MouseEvent) => {
     sound.playClick(600);
+    // Navigate to dedicated page for clean UX, or open modal
     if (user.isGuest) {
-      setIsAuthOpen(true);
+      router.push("/login");
     } else {
-      setIsProfileOpen(true);
+      router.push("/profile");
     }
   };
 
@@ -74,7 +75,7 @@ export const Header: React.FC = () => {
                 sound.playClick(400);
                 setIsGamesMenuOpen(!isGamesMenuOpen);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
+              className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
             >
               Каталог игр ({GAMES_CATALOG.length})
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -108,23 +109,21 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Leaderboard Button */}
-          <button
-            onClick={() => {
-              sound.playClick(600);
-              setIsLeaderboardOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-900/40 hover:text-white transition-all shadow-[0_0_12px_rgba(251,191,36,0.2)]"
+          {/* Leaderboard Link */}
+          <Link
+            href="/leaderboard"
+            onClick={() => sound.playClick(600)}
+            className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-900/40 hover:text-white transition-all shadow-[0_0_12px_rgba(251,191,36,0.2)]"
             title="Таблица лидеров"
           >
             <Trophy className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Лидеры</span>
-          </button>
+          </Link>
 
           {/* Random Game button */}
           <button
             onClick={handleRandomGame}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-400 hover:bg-purple-600/40 transition-all shadow-[0_0_12px_rgba(168,85,247,0.2)] active:scale-95"
+            className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-500/40 text-purple-300 hover:text-white hover:border-purple-400 hover:bg-purple-600/40 transition-all shadow-[0_0_12px_rgba(168,85,247,0.2)] active:scale-95"
             title="Случайная игра"
           >
             <Dices className="w-4 h-4 text-pink-400" />
@@ -134,13 +133,13 @@ export const Header: React.FC = () => {
           {/* Sound Mute Toggle */}
           <SoundButton />
 
-          {/* User Account / Profile Button */}
+          {/* User Account / Profile Link */}
           <button
             onClick={handleUserClick}
-            className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800 transition-all group"
+            className="min-h-[44px] flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-800 transition-all group focus-visible:ring-2 focus-visible:ring-cyan-400"
             title={user.isGuest ? "Войти в аккаунт" : "Профиль игрока"}
           >
-            <span className="text-lg">{user.avatar}</span>
+            <span className="text-xl">{user.avatar}</span>
             <div className="text-left hidden sm:block">
               <div className="text-xs font-bold text-slate-200 group-hover:text-cyan-300 max-w-[90px] truncate leading-tight">
                 {user.username}
@@ -155,14 +154,13 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Auth Modal */}
+      {/* Fallback Modals for in-game contexts */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onSuccess={(updated) => setUser(updated)}
       />
 
-      {/* Profile Modal */}
       <UserProfileModal
         user={user}
         isOpen={isProfileOpen}
@@ -170,7 +168,6 @@ export const Header: React.FC = () => {
         onUpdate={(updated) => setUser(updated)}
       />
 
-      {/* Leaderboard Modal */}
       <LeaderboardModal
         isOpen={isLeaderboardOpen}
         onClose={() => setIsLeaderboardOpen(false)}
