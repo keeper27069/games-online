@@ -21,16 +21,15 @@ export const Footer: React.FC = () => {
               Современный игровой веб-портал настольных и казуальных развлечений. 
               Мгновенный запуск прямо в браузере, умные боты, звук Web Audio API и полная поддержка любых экранов.
             </p>
-            <div className="flex items-center gap-3 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
               <span className="inline-flex items-center gap-1">
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
-                Vercel Serverless Ready
+                Vercel Serverless
               </span>
               <span>•</span>
-              <span className="inline-flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Offline AI Ready
-              </span>
+              <Link href="/admin" className="text-cyan-400 hover:text-cyan-300 font-semibold underline">
+                Бэкенд & База пользователей
+              </Link>
             </div>
           </div>
 
