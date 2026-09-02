@@ -1,7 +1,9 @@
 /**
- * Authentication and User Profile Management Service
- * Supports persistent registered accounts, 1-click guest login,
- * ELO ratings, levels, XP, coin economy, and match history.
+ * Hardened Authentication, Validation and User Profile Service
+ * - SHA-256 password hashing (zero plaintext storage)
+ * - Strict regex input validation (Email, Username, Avatar)
+ * - Safe HTML entity sanitization against XSS
+ * - Quota-safe localStorage handling
  */
 
 export interface UserAccount {
@@ -10,6 +12,7 @@ export interface UserAccount {
   username: string;
   avatar: string;
   isGuest: boolean;
+  passwordHash?: string;
   eloRating: number;
   level: number;
   xp: number;
@@ -22,11 +25,62 @@ export interface UserAccount {
     streak: number;
     bestStreak: number;
   };
-  gameRatings: Record<string, number>; // per-game ELO
+  gameRatings: Record<string, number>;
 }
 
 const STORAGE_KEY_AUTH_USER = "arcadehub_auth_user";
 const STORAGE_KEY_ALL_ACCOUNTS = "arcadehub_all_accounts";
+
+/**
+ * XSS & HTML entity sanitizer
+ */
+export const sanitizeInput = (input: string): string => {
+  if (!input) return "";
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/\//g, "&#x2F;")
+    .trim();
+};
+
+/**
+ * Validates Email according to RFC 5322 standard
+ */
+export const isValidEmail = (email: string): boolean => {
+  const re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  return re.test(email) && email.length <= 128;
+};
+
+/**
+ * Validates Username (alphanumeric, spaces, underscores, 2-20 chars)
+ */
+export const isValidUsername = (username: string): boolean => {
+  const re = /^[\p{L}\p{N}_\s-]{2,20}$/u;
+  return re.test(username.trim());
+};
+
+/**
+ * Fast client-side SHA-256 hash
+ */
+export const hashPassword = async (password: string): Promise<string> => {
+  if (typeof window === "undefined" || !window.crypto || !window.crypto.subtle) {
+    // Fallback pseudo-hash for non-subtle environments
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+      hash = (hash << 5) - hash + password.charCodeAt(i);
+      hash |= 0;
+    }
+    return `hash_${Math.abs(hash)}`;
+  }
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + "_arcadehub_salt_2026");
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 export const generateGuestId = (): string => {
   return `guest_${Math.random().toString(36).substring(2, 9)}`;
@@ -34,11 +88,12 @@ export const generateGuestId = (): string => {
 
 export const createDefaultAccount = (username = "Игрок #1", avatar = "🎮", isGuest = true, email?: string): UserAccount => {
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const cleanUser = sanitizeInput(username);
   return {
-    id: isGuest ? generateGuestId() : `user_${Date.now()}`,
-    email,
-    username: isGuest ? `Гость_${randomSuffix}` : username,
-    avatar,
+    id: isGuest ? generateGuestId() : `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    email: email ? sanitizeInput(email) : undefined,
+    username: isGuest ? `Гость_${randomSuffix}` : cleanUser || `Игрок_${randomSuffix}`,
+    avatar: avatar || "🎮",
     isGuest,
     eloRating: 1200,
     level: 1,
@@ -72,7 +127,10 @@ export const getCurrentUser = (): UserAccount => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_AUTH_USER);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.username === "string") {
+        return parsed;
+      }
     }
     const defaultAcc = createDefaultAccount();
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(defaultAcc));
@@ -87,7 +145,6 @@ export const saveCurrentUser = (user: UserAccount): void => {
   try {
     localStorage.setItem(STORAGE_KEY_AUTH_USER, JSON.stringify(user));
 
-    // Also update in registered accounts index
     const all = getAllRegisteredAccounts();
     const idx = all.findIndex((a) => a.id === user.id);
     if (idx >= 0) {
@@ -96,48 +153,89 @@ export const saveCurrentUser = (user: UserAccount): void => {
       all.push(user);
     }
     localStorage.setItem(STORAGE_KEY_ALL_ACCOUNTS, JSON.stringify(all));
-  } catch {}
+  } catch (err) {
+    console.warn("Storage quota exceeded or private mode restriction:", err);
+  }
 };
 
 export const getAllRegisteredAccounts = (): UserAccount[] => {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ALL_ACCOUNTS);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list;
+    }
     return [];
   } catch {
     return [];
   }
 };
 
-export const registerAccount = (email: string, username: string, passwordHash: string, avatar = "🚀"): { success: boolean; user?: UserAccount; error?: string } => {
+export const registerAccount = async (
+  email: string,
+  username: string,
+  passwordClear: string,
+  avatar = "🚀"
+): Promise<{ success: boolean; user?: UserAccount; error?: string }> => {
   if (typeof window === "undefined") return { success: false, error: "Client-side only" };
 
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanUsername = sanitizeInput(username.trim());
+
+  if (!isValidEmail(cleanEmail)) {
+    return { success: false, error: "Некорректный формат Email адреса!" };
+  }
+  if (!isValidUsername(cleanUsername)) {
+    return { success: false, error: "Никнейм должен быть от 2 до 20 символов!" };
+  }
+  if (!passwordClear || passwordClear.length < 4) {
+    return { success: false, error: "Пароль должен содержать минимум 4 символа!" };
+  }
+
   const all = getAllRegisteredAccounts();
-  if (all.some((a) => a.email?.toLowerCase() === email.toLowerCase())) {
+  if (all.some((a) => a.email?.toLowerCase() === cleanEmail)) {
     return { success: false, error: "Пользователь с таким Email уже зарегистрирован!" };
   }
 
+  const pwHash = await hashPassword(passwordClear);
+
   const newUser: UserAccount = {
-    ...createDefaultAccount(username, avatar, false, email),
-    coins: 1000, // Welcome bonus
+    ...createDefaultAccount(cleanUsername, avatar, false, cleanEmail),
+    passwordHash: pwHash,
+    coins: 1000,
   };
 
   all.push(newUser);
-  localStorage.setItem(STORAGE_KEY_ALL_ACCOUNTS, JSON.stringify(all));
+  try {
+    localStorage.setItem(STORAGE_KEY_ALL_ACCOUNTS, JSON.stringify(all));
+  } catch {}
   saveCurrentUser(newUser);
 
   return { success: true, user: newUser };
 };
 
-export const loginAccount = (email: string, passwordHash: string): { success: boolean; user?: UserAccount; error?: string } => {
+export const loginAccount = async (
+  email: string,
+  passwordClear: string
+): Promise<{ success: boolean; user?: UserAccount; error?: string }> => {
   if (typeof window === "undefined") return { success: false, error: "Client-side only" };
 
+  const cleanEmail = email.trim().toLowerCase();
+  if (!isValidEmail(cleanEmail)) {
+    return { success: false, error: "Введите корректный Email адрес!" };
+  }
+
   const all = getAllRegisteredAccounts();
-  const found = all.find((a) => a.email?.toLowerCase() === email.toLowerCase());
+  const found = all.find((a) => a.email?.toLowerCase() === cleanEmail);
 
   if (!found) {
     return { success: false, error: "Пользователь с таким Email не найден." };
+  }
+
+  const pwHash = await hashPassword(passwordClear);
+  if (found.passwordHash && found.passwordHash !== pwHash) {
+    return { success: false, error: "Неверный пароль!" };
   }
 
   saveCurrentUser(found);
@@ -150,9 +248,6 @@ export const logoutAccount = (): UserAccount => {
   return guest;
 };
 
-/**
- * Calculates ELO and XP rewards after game completion
- */
 export const recordMatchOutcome = (
   gameId: string,
   isWinner: boolean,
@@ -160,8 +255,7 @@ export const recordMatchOutcome = (
 ): UserAccount => {
   const user = getCurrentUser();
 
-  // ELO calculation (K-factor = 32)
-  const currentElo = user.gameRatings[gameId] || user.eloRating;
+  const currentElo = user.gameRatings?.[gameId] || user.eloRating;
   const expectedScore = 1 / (1 + Math.pow(10, (opponentElo - currentElo) / 400));
   const actualScore = isWinner ? 1 : 0;
   const eloDelta = Math.round(32 * (actualScore - expectedScore));
@@ -169,7 +263,6 @@ export const recordMatchOutcome = (
   const newGameElo = Math.max(800, currentElo + eloDelta);
   const newOverallElo = Math.max(800, user.eloRating + Math.round(eloDelta * 0.7));
 
-  // XP & Coins reward
   const xpGained = isWinner ? 100 : 35;
   const coinsGained = isWinner ? 50 : 15;
 

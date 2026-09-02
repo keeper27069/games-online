@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 
-// In-memory / serverless store simulation for Vercel
-let serverUsers: any[] = [
+// In-memory serverless cache
+const serverUsers: Array<{
+  id: string;
+  username: string;
+  avatar: string;
+  email?: string;
+  eloRating: number;
+  level: number;
+  coins: number;
+  createdAt: string;
+}> = [
   {
     id: "champ_1",
     username: "GrandMaster_Pro",
@@ -24,32 +33,77 @@ let serverUsers: any[] = [
   },
 ];
 
+const sanitize = (str: string) => {
+  return str.replace(/[<>'"&/]/g, "").trim();
+};
+
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    totalUsers: serverUsers.length,
-    users: serverUsers,
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      totalUsers: serverUsers.length,
+      users: serverUsers.map((u) => ({
+        id: u.id,
+        username: u.username,
+        avatar: u.avatar,
+        eloRating: u.eloRating,
+        level: u.level,
+        coins: u.coins,
+        createdAt: u.createdAt,
+      })),
+      timestamp: new Date().toISOString(),
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30",
+      },
+    }
+  );
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { email, username, avatar } = body;
-
-    if (!email || !username) {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
       return NextResponse.json(
-        { success: false, error: "Email и никнейм обязательны" },
+        { success: false, error: "Content-Type must be application/json" },
+        { status: 415 }
+      );
+    }
+
+    const body = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { success: false, error: "Invalid JSON body" },
         { status: 400 }
       );
     }
 
+    const { email, username, avatar } = body;
+
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json(
+        { success: false, error: "Некорректный Email" },
+        { status: 400 }
+      );
+    }
+
+    if (!username || typeof username !== "string" || username.trim().length < 2) {
+      return NextResponse.json(
+        { success: false, error: "Никнейм должен быть не менее 2 символов" },
+        { status: 400 }
+      );
+    }
+
+    const cleanEmail = sanitize(email).toLowerCase();
+    const cleanUsername = sanitize(username).slice(0, 20);
+    const cleanAvatar = typeof avatar === "string" ? sanitize(avatar).slice(0, 4) : "🚀";
+
     const newUser = {
-      id: `user_${Date.now()}`,
-      email,
-      username,
-      avatar: avatar || "🚀",
+      id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      email: cleanEmail,
+      username: cleanUsername,
+      avatar: cleanAvatar || "🚀",
       eloRating: 1200,
       level: 1,
       coins: 1000,
@@ -60,12 +114,19 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Пользователь успешно зарегистрирован на сервере",
-      user: newUser,
+      message: "Пользователь успешно зарегистрирован",
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        avatar: newUser.avatar,
+        eloRating: newUser.eloRating,
+        level: newUser.level,
+        coins: newUser.coins,
+      },
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: err.message || "Ошибка сервера" },
+      { success: false, error: "Ошибка обработки запроса" },
       { status: 500 }
     );
   }
