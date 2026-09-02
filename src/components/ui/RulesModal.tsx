@@ -17,8 +17,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({ game, isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
-      <div className="relative w-full max-w-xl my-auto rounded-2xl glass-panel-glow border border-cyan-500/30 shadow-2xl max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div className="flex min-h-full items-center justify-center p-3 sm:p-6 text-center">
+        <div className="relative w-full max-w-xl transform rounded-2xl glass-panel-glow border border-cyan-500/30 shadow-2xl text-left bg-slate-950/95 transition-all my-6 sm:my-8">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-700/60 bg-slate-900/60">
           <div className="flex items-center gap-3">
@@ -125,5 +126,6 @@ export const RulesModal: React.FC<RulesModalProps> = ({ game, isOpen, onClose })
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
