@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { User, Lock, Mail, Sparkles, X, Check, ArrowRight, UserPlus, LogIn } from "lucide-react";
+import { User, Lock, Mail, Sparkles, X, Check, ArrowRight, UserPlus, LogIn, AlertCircle } from "lucide-react";
 import { registerAccount, loginAccount, getCurrentUser, saveCurrentUser, createDefaultAccount, UserAccount } from "@/lib/auth-service";
 import { sound } from "@/lib/sound";
 
@@ -20,25 +20,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [password, setPassword] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🚀");
   const [error, setError] = useState<string | null>(null);
+  const [canAutoRegister, setCanAutoRegister] = useState(false);
 
   if (!isOpen) return null;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setCanAutoRegister(false);
+
     if (!email || !password) {
-      setError("Заполните все поля!");
+      setError("Заполните Email и пароль!");
       sound.playError();
       return;
     }
 
-    const res = loginAccount(email, password);
+    const res = loginAccount(email.trim(), password);
     if (res.success && res.user) {
       sound.playWin();
       onSuccess(res.user);
       onClose();
     } else {
-      setError(res.error || "Ошибка входа");
+      setError(res.error || "Пользователь с таким Email не найден.");
+      setCanAutoRegister(true);
+      sound.playError();
+    }
+  };
+
+  const handleQuickRegister = () => {
+    if (!email || !password) return;
+    const defaultNick = email.split("@")[0] || "Игрок";
+    const res = registerAccount(email.trim(), defaultNick, password, selectedAvatar);
+    if (res.success && res.user) {
+      sound.playWin();
+      onSuccess(res.user);
+      onClose();
+    } else {
+      setError(res.error || "Ошибка регистрации");
       sound.playError();
     }
   };
@@ -52,7 +70,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       return;
     }
 
-    const res = registerAccount(email, username, password, selectedAvatar);
+    const res = registerAccount(email.trim(), username.trim(), password, selectedAvatar);
     if (res.success && res.user) {
       sound.playWin();
       onSuccess(res.user);
@@ -103,6 +121,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               sound.playClick(500);
               setTab("login");
               setError(null);
+              setCanAutoRegister(false);
             }}
             className={`py-2 rounded-xl transition-all ${
               tab === "login"
@@ -117,6 +136,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               sound.playClick(500);
               setTab("register");
               setError(null);
+              if (!username && email) {
+                setUsername(email.split("@")[0]);
+              }
             }}
             className={`py-2 rounded-xl transition-all ${
               tab === "register"
@@ -142,10 +164,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           </button>
         </div>
 
-        {/* Error banner */}
+        {/* Error banner with Smart One-Click Register Button */}
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-semibold animate-shake">
-            {error}
+          <div className="mb-4 p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs space-y-2 animate-fadeIn">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{error}</span>
+            </div>
+
+            {canAutoRegister && (
+              <div className="pt-2 border-t border-rose-800/50 flex flex-col gap-1.5">
+                <span className="text-[11px] text-slate-300">
+                  Хотите создать новый аккаунт с этим email прямо сейчас?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleQuickRegister}
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs shadow-[0_0_12px_rgba(16,185,129,0.4)] hover:scale-102 active:scale-98 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Создать аккаунт в 1 клик (+1000 монет)
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -189,6 +230,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <LogIn className="w-4 h-4" />
               Войти в профиль
             </button>
+
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick(500);
+                  setTab("register");
+                  if (!username && email) setUsername(email.split("@")[0]);
+                }}
+                className="text-xs text-slate-400 hover:text-cyan-300 transition-colors"
+              >
+                Нет аккаунта? <span className="font-bold text-cyan-400 underline">Зарегистрироваться</span>
+              </button>
+            </div>
           </form>
         )}
 
