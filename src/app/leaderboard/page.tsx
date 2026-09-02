@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+
 import { getLeaderboardData } from "@/lib/leaderboard-service";
 import { GAMES_CATALOG } from "@/types/games";
 import { sound } from "@/lib/sound";
@@ -17,9 +16,6 @@ export default function LeaderboardPage() {
   const restOfList = data.slice(3);
 
   return (
-    <div className="min-h-screen bg-arcade-dark text-slate-100 flex flex-col justify-between">
-      <Header />
-
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2">
@@ -168,8 +164,5 @@ export default function LeaderboardPage() {
           ))}
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }

@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+
 import { getCurrentUser, saveCurrentUser, logoutAccount, UserAccount } from "@/lib/auth-service";
 import { sound } from "@/lib/sound";
 import { GAMES_CATALOG } from "@/types/games";
@@ -36,9 +35,6 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-arcade-dark text-slate-100 flex flex-col justify-between">
-      <Header />
-
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2">
@@ -167,8 +163,5 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }

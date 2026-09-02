@@ -3,8 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+
 import { registerAccount, loginAccount, getCurrentUser, saveCurrentUser, createDefaultAccount, UserAccount, sanitizeInput } from "@/lib/auth-service";
 import { sound } from "@/lib/sound";
 import { Sparkles, User, Lock, Mail, UserPlus, LogIn, ArrowLeft, Trophy, Zap, Shield, Check, Loader2, AlertCircle } from "lucide-react";
@@ -117,9 +116,6 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-arcade-dark text-slate-100 flex flex-col justify-between">
-      <Header />
-
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 my-8">
         <div className="w-full max-w-md rounded-3xl glass-panel-glow border border-cyan-500/30 shadow-2xl p-6 sm:p-8 bg-slate-950/95 relative overflow-hidden">
           {/* Ambient Glow */}
@@ -430,9 +426,6 @@ function LoginContent() {
           )}
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }
 
